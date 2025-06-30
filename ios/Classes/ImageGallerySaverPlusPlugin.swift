@@ -28,12 +28,13 @@ public class ImageGallerySaverPlusPlugin: NSObject, FlutterPlugin {
         guard let arguments = call.arguments as? [String: Any],
               let path = arguments["file"] as? String,
               let _ = arguments["name"],
+              let isReturnVideoId = arguments["isReturnIdOfIOS"] as? Bool,
               let isReturnFilePath = arguments["isReturnPathOfIOS"] as? Bool else { return }
-        if (isImageFile(filename: path)) {
+        if (isImageFile(filename: path)) {  
             saveImageAtFileUrl(path, isReturnImagePath: isReturnFilePath)
         } else {
             if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(path)) {
-                saveVideo(path, isReturnImagePath: isReturnFilePath)
+                saveVideo(path, isReturnImagePath: isReturnFilePath, isReturnVideoId: isReturnVideoId)
             }else{
                 self.saveResult(isSuccess:false,error:self.errorMessage)
             }
@@ -43,8 +44,8 @@ public class ImageGallerySaverPlusPlugin: NSObject, FlutterPlugin {
       }
     }
     
-    func saveVideo(_ path: String, isReturnImagePath: Bool) {
-        if !isReturnImagePath {
+    func saveVideo(_ path: String, isReturnImagePath: Bool, isReturnVideoId: Bool) {
+        if !isReturnImagePath && !isReturnVideoId {
             UISaveVideoAtPathToSavedPhotosAlbum(path, self, #selector(didFinishSavingVideo(videoPath:error:contextInfo:)), nil)
             return
         }
@@ -58,12 +59,16 @@ public class ImageGallerySaverPlusPlugin: NSObject, FlutterPlugin {
         }, completionHandler: { [unowned self] (success, error) in
             DispatchQueue.main.async {
                 if (success && videoIds.count > 0) {
-                    let assetResult = PHAsset.fetchAssets(withLocalIdentifiers: videoIds, options: nil)
-                    if (assetResult.count > 0) {
-                        let videoAsset = assetResult[0]
-                        PHImageManager().requestAVAsset(forVideo: videoAsset, options: nil) { (avurlAsset, audioMix, info) in
-                            if let urlStr = (avurlAsset as? AVURLAsset)?.url.absoluteString {
-                                self.saveResult(isSuccess: true, filePath: urlStr)
+                    if isReturnVideoId {
+                        self.saveResult(isSuccess: true, filePath: videoIds[0])
+                    } else {
+                        let assetResult = PHAsset.fetchAssets(withLocalIdentifiers: videoIds, options: nil)
+                        if (assetResult.count > 0) {
+                            let videoAsset = assetResult[0]
+                            PHImageManager().requestAVAsset(forVideo: videoAsset, options: nil) { (avurlAsset, audioMix, info) in
+                                if let urlStr = (avurlAsset as? AVURLAsset)?.url.absoluteString {
+                                    self.saveResult(isSuccess: true, filePath: urlStr)
+                                }
                             }
                         }
                     }
